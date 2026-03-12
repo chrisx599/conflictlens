@@ -64,9 +64,10 @@ export default function PracticeMode() {
                 speaker: currentLine.speaker,
                 language: lang,
             });
+            const nextAttempts = [...attempts, { original: currentLine.text, rewrite: rewriteText, ...result }];
             setFeedback(result);
-            setAttempts(prev => [...prev, { original: currentLine.text, rewrite: rewriteText, ...result }]);
-            dispatch({ type: 'SET_PRACTICE', payload: { attempts: [...attempts, { original: currentLine.text, rewrite: rewriteText, ...result }] } });
+            setAttempts(nextAttempts);
+            dispatch({ type: 'SET_PRACTICE', payload: { attempts: nextAttempts } });
         } catch (err) {
             setFeedback({ error: err.message });
         } finally {

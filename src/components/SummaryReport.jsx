@@ -9,6 +9,8 @@ export default function SummaryReport() {
     const { state, dispatch } = useApp();
     const { t, lang } = useLang();
     const ts = t.summary;
+    const assessment = state.assessment || state.conflictStyles;
+    const practice = state.practice || { attempts: state.practiceAttempts || [] };
 
     const [report, setReport] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -26,12 +28,13 @@ export default function SummaryReport() {
         try {
             const result = await generateSummary({
                 scenario: state.scenario,
-                assessment: state.assessment,
+                assessment,
                 dialogue: state.dialogue,
-                practice: state.practice,
+                practice,
                 language: lang,
             });
             setReport(result);
+            dispatch({ type: 'SET_SUMMARY', payload: result });
         } catch (err) {
             setError(err.message);
         } finally {
@@ -178,6 +181,14 @@ export default function SummaryReport() {
                                 </button>
                             ))}
                         </div>
+                    </div>
+                )}
+
+                {report.closingMessage && (
+                    <div className="report-section">
+                        <p style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
+                            {report.closingMessage}
+                        </p>
                     </div>
                 )}
             </div>

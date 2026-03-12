@@ -179,10 +179,30 @@ export default function ScenarioInput() {
 
     /* ── Results Phase ── */
     if (phase === 'results') {
-        const a = state.assessment;
+        const a = state.assessment || state.conflictStyles;
+
+        if (!a?.self || !a?.other) {
+            return (
+                <motion.div className="glass-card" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                    <p style={{ color: 'var(--accent-danger)', marginBottom: 'var(--space-4)' }}>
+                        {error || 'Assessment result is incomplete.'}
+                    </p>
+                    <button className="btn btn--primary" onClick={() => setPhase('other-quiz')}>
+                        {ta.retryBtn || ta.prevBtn}
+                    </button>
+                </motion.div>
+            );
+        }
+
         return (
             <motion.div className="glass-card" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                 <h2 className="section-title">{ta.resultsTitle}</h2>
+
+                {a.dynamicAnalysis && (
+                    <div className="glass-card--flat" style={{ padding: 'var(--space-4)', marginBottom: 'var(--space-6)', fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>
+                        {a.dynamicAnalysis}
+                    </div>
+                )}
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-6)', marginBottom: 'var(--space-8)' }}>
                     {[{ data: a.self, name: scenario.selfName }, { data: a.other, name: scenario.otherName }].map(({ data, name }) => (
@@ -199,6 +219,11 @@ export default function ScenarioInput() {
                                 <span style={{ color: 'var(--accent-warning)' }}>⚠ {ta.blindspots}:</span>{' '}
                                 <span style={{ color: 'var(--text-secondary)' }}>{data.blindspots}</span>
                             </p>
+                            {data.description && (
+                                <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginTop: 'var(--space-4)' }}>
+                                    {data.description}
+                                </p>
+                            )}
                         </div>
                     ))}
                 </div>

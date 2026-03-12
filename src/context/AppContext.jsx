@@ -8,13 +8,15 @@ const initialState = {
         description: '',
         selfName: '',
         otherName: '',
-        relationshipType: '',
+        relationship: '',
     },
     selfAnswers: [],
     otherAnswers: [],
+    assessment: null,
     conflictStyles: null,     // LLM response from assessment
     dialogue: null,           // LLM-generated dialogue
     reflections: [],          // user's reflection notes
+    practice: { attempts: [] },
     practiceAttempts: [],     // { original, rewrite, feedback }
     summary: null,            // LLM-generated summary report
 };
@@ -27,14 +29,31 @@ function reducer(state, action) {
             return { ...state, selfAnswers: action.payload };
         case 'SET_OTHER_ANSWERS':
             return { ...state, otherAnswers: action.payload };
+        case 'SET_ASSESSMENT':
         case 'SET_CONFLICT_STYLES':
-            return { ...state, conflictStyles: action.payload };
+            return {
+                ...state,
+                assessment: action.payload,
+                conflictStyles: action.payload,
+            };
         case 'SET_DIALOGUE':
             return { ...state, dialogue: action.payload };
         case 'ADD_REFLECTION':
             return { ...state, reflections: [...state.reflections, action.payload] };
+        case 'SET_PRACTICE':
+            return {
+                ...state,
+                practice: action.payload,
+                practiceAttempts: action.payload?.attempts || [],
+            };
         case 'ADD_PRACTICE_ATTEMPT':
-            return { ...state, practiceAttempts: [...state.practiceAttempts, action.payload] };
+            return {
+                ...state,
+                practiceAttempts: [...state.practiceAttempts, action.payload],
+                practice: {
+                    attempts: [...state.practiceAttempts, action.payload],
+                },
+            };
         case 'SET_SUMMARY':
             return { ...state, summary: action.payload };
         case 'SET_STEP':

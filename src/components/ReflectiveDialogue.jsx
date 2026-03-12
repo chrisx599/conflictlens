@@ -9,6 +9,7 @@ export default function ReflectiveDialogue() {
     const { state, dispatch } = useApp();
     const { t, lang } = useLang();
     const td = t.dialogue;
+    const assessment = state.assessment || state.conflictStyles;
 
     const [dialogue, setDialogue] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -32,8 +33,8 @@ export default function ReflectiveDialogue() {
                 selfName: state.scenario.selfName,
                 otherName: state.scenario.otherName,
                 relationship: state.scenario.relationship,
-                selfStyle: state.assessment?.self,
-                otherStyle: state.assessment?.other,
+                selfStyle: assessment?.self,
+                otherStyle: assessment?.other,
                 language: lang,
             });
             setDialogue(result);
@@ -84,7 +85,8 @@ export default function ReflectiveDialogue() {
 
     if (!dialogue) return null;
 
-    const highlightedIndices = dialogue.lines
+    const lines = Array.isArray(dialogue.lines) ? dialogue.lines : [];
+    const highlightedIndices = lines
         .map((l, i) => (l.pattern ? i : -1))
         .filter(i => i >= 0);
     const reflectedCount = Object.keys(reflections).length;
@@ -101,7 +103,7 @@ export default function ReflectiveDialogue() {
             )}
 
             <div className="chat-container">
-                {dialogue.lines.map((line, idx) => {
+                {lines.map((line, idx) => {
                     const isSelf = line.speaker === state.scenario.selfName;
                     const hasPattern = !!line.pattern;
                     const isExpanded = expandedLine === idx;
