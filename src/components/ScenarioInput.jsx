@@ -40,7 +40,23 @@ export default function ScenarioInput() {
         try {
             const result = await uploadScreenshot(file);
             dispatch({ type: 'SET_SCREENSHOT_DATA', payload: result });
-            if (result.raw_text) {
+            if (result.messages && result.messages.length > 0) {
+                // Format each message as "名字：内容", using entered names or defaults
+                const formatted = result.messages
+                    .map(m => {
+                        const name = m.speaker === 'right'
+                            ? (scenario.selfName || '我')
+                            : (scenario.otherName || '对方');
+                        return `${name}：${m.text}`;
+                    })
+                    .join('\n');
+                setScenario(s => ({
+                    ...s,
+                    description: s.description
+                        ? s.description + '\n\n--- 截图内容 ---\n' + formatted
+                        : formatted,
+                }));
+            } else if (result.raw_text) {
                 setScenario(s => ({ ...s, description: s.description ? s.description + '\n\n--- 截图内容 ---\n' + result.raw_text : result.raw_text }));
             }
             setScreenshotStatus('success');

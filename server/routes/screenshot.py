@@ -1,30 +1,33 @@
+import mimetypes
 from fastapi import APIRouter, UploadFile, File
 from pydantic import BaseModel
-from typing import Optional
-from ..llm import chat_json
-from ..mineru import upload_and_parse
+from ..llm import chat_vision_json, chat_json
 
 router = APIRouter()
 
 
-SCREENSHOT_EXTRACT_SYSTEM = """You are a message extractor. Given raw text (OCR output from a chat screenshot), 
-extract the conversation messages in order.
+VISION_EXTRACT_SYSTEM = """You are a chat message extractor. You will receive a screenshot of a chat conversation (e.g. WeChat, WhatsApp, iMessage, etc.).
 
-Return JSON:
+Your task is to extract ALL messages visible in the screenshot, in chronological order (top to bottom).
+
+Return valid JSON in this exact shape:
 {
   "messages": [
-    {"speaker": "left" or "right", "text": "message content"},
+    {"speaker": "left" | "right", "text": "<message content>"},
     ...
   ],
-  "raw_text": "the cleaned-up full text"
+  "raw_text": "<all messages joined as plain text, one per line>"
 }
 
 Rules:
-- "left" = messages on the left side (typically the other person)
-- "right" = messages on the right side (typically the user/self)
-- Preserve original language
-- If you cannot determine speaker sides, use "unknown"
-- Extract ALL messages in chronological order"""
+- "right" = messages on the RIGHT side (bubble aligned to the right, often in green/blue/colored background) — this is typically the user/self
+- "left"  = messages on the LEFT side (bubble aligned to the left, often in white/grey background) — this is typically the other person
+- Extract EVERY message, including very short ones like "好的", "嗯", "哦", "拜拜", "ok", etc.
+- For sticker / emoji images that contain readable text (e.g. a sticker with the word "哦" on it), include that text.
+- For pure image stickers with no text, write "[贴纸]" (or "[sticker]" for English conversations).
+- Preserve the original language exactly.
+- Do NOT skip any messages, even if they seem short or unimportant.
+- Do NOT merge separate messages into one."""
 
 
 PARTNER_ESTIMATION_SYSTEM = """You are a relationship psychologist specializing in the Romantic Partner Conflict Scale (RPCS).
@@ -48,23 +51,34 @@ Return JSON:
 Each answer is on a 1-5 Likert scale (1=Strongly Disagree, 5=Strongly Agree)."""
 
 
+def _guess_media_type(filename: str, content_type: str | None) -> str:
+    """Best-effort media type for the uploaded image."""
+    if content_type and content_type.startswith("image/"):
+        return content_type
+    guessed, _ = mimetypes.guess_type(filename)
+    if guessed and guessed.startswith("image/"):
+        return guessed
+    return "image/png"
+
+
 @router.post("/api/screenshot/upload")
 async def upload_screenshot(file: UploadFile = File(...)):
-    """Upload a screenshot image, extract messages via MinerU OCR + LLM."""
+    """Upload a chat screenshot and extract all messages using Vision LLM."""
     contents = await file.read()
     filename = file.filename or "screenshot.png"
+    media_type = _guess_media_type(filename, file.content_type)
 
-    # Use MinerU to OCR the image
-    markdown_text = await upload_and_parse(contents, filename, language="ch")
+    user_prompt = (
+        "Please extract every chat message visible in this screenshot, "
+        "following the JSON format described in the system prompt."
+    )
 
-    # Use LLM to extract structured messages from the markdown
-    user_prompt = f"""Here is the OCR output from a chat screenshot:
-
-{markdown_text}
-
-Please extract the conversation messages in order."""
-
-    result = chat_json(SCREENSHOT_EXTRACT_SYSTEM, user_prompt)
+    result = chat_vision_json(
+        VISION_EXTRACT_SYSTEM,
+        user_prompt,
+        image_bytes=contents,
+        image_media_type=media_type,
+    )
     return result
 
 

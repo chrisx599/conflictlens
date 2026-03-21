@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { useApp } from '../context/AppContext';
@@ -82,9 +82,7 @@ export default function ReflectiveDialogue() {
         }
     };
 
-    const allAnnotated = useMemo(() => {
-        return lines.length > 0 && lines.every((_, i) => annotations[i] !== undefined);
-    }, [annotations, lines]);
+    const allAnnotated = lines.length > 0;
 
     const handleSaveReflection = async () => {
         if (!reflectionText.trim()) return;

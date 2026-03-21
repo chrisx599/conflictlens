@@ -1,7 +1,5 @@
 const API_BASE = '/api';
 
-const STYLE_KEYS = ['competing', 'collaborating', 'compromising', 'avoiding', 'accommodating'];
-
 const PATTERN_MAP = {
     criticism: 'criticism',
     contempt: 'contempt',
@@ -35,11 +33,11 @@ function normalizePattern(pattern) {
 }
 
 function normalizeScores(scores = {}) {
-    return STYLE_KEYS.reduce((acc, key) => {
-        const raw = firstDefined(scores[key], scores[key.toLowerCase?.()]);
-        acc[key] = Number(raw) || 0;
-        return acc;
-    }, {});
+    // Pass through all keys returned by the LLM (RPCS subscales:
+    // compromise, domination, submission, separation, avoidance, reactivity)
+    return Object.fromEntries(
+        Object.entries(scores).map(([k, v]) => [k, Number(v) || 0])
+    );
 }
 
 function normalizeAssessmentPerson(person = {}) {
