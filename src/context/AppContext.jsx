@@ -10,21 +10,27 @@ const initialState = {
         otherName: '',
         relationship: '',
     },
+    screenshotData: null,      // extracted messages from screenshot
     selfAnswers: [],
     otherAnswers: [],
     assessment: null,
-    conflictStyles: null,     // LLM response from assessment
-    dialogue: null,           // LLM-generated dialogue
-    reflections: [],          // user's reflection notes
+    conflictStyles: null,      // compatibility alias for assessment results
+    dialogue: null,            // LLM-generated dialogue
+    annotations: {},           // user's annotations { lineIdx: behaviorType }
+    annotationResults: null,   // accuracy results from annotation check
+    reflections: [],           // user's reflection notes
     practice: { attempts: [] },
-    practiceAttempts: [],     // { original, rewrite, feedback }
-    summary: null,            // LLM-generated summary report
+    practiceAttempts: [],      // { original, rewrite, feedback }
+    roleplayHistory: [],       // roleplay conversation history
+    summary: null,             // LLM-generated summary report
 };
 
 function reducer(state, action) {
     switch (action.type) {
         case 'SET_SCENARIO':
             return { ...state, scenario: { ...state.scenario, ...action.payload } };
+        case 'SET_SCREENSHOT_DATA':
+            return { ...state, screenshotData: action.payload };
         case 'SET_SELF_ANSWERS':
             return { ...state, selfAnswers: action.payload };
         case 'SET_OTHER_ANSWERS':
@@ -38,6 +44,12 @@ function reducer(state, action) {
             };
         case 'SET_DIALOGUE':
             return { ...state, dialogue: action.payload };
+        case 'SET_ANNOTATION':
+            return { ...state, annotations: { ...state.annotations, [action.payload.idx]: action.payload.label } };
+        case 'SET_ALL_ANNOTATIONS':
+            return { ...state, annotations: action.payload };
+        case 'SET_ANNOTATION_RESULTS':
+            return { ...state, annotationResults: action.payload };
         case 'ADD_REFLECTION':
             return { ...state, reflections: [...state.reflections, action.payload] };
         case 'SET_PRACTICE':
@@ -46,14 +58,18 @@ function reducer(state, action) {
                 practice: action.payload,
                 practiceAttempts: action.payload?.attempts || [],
             };
-        case 'ADD_PRACTICE_ATTEMPT':
+        case 'ADD_PRACTICE_ATTEMPT': {
+            const nextAttempts = [...state.practiceAttempts, action.payload];
             return {
                 ...state,
-                practiceAttempts: [...state.practiceAttempts, action.payload],
-                practice: {
-                    attempts: [...state.practiceAttempts, action.payload],
-                },
+                practiceAttempts: nextAttempts,
+                practice: { attempts: nextAttempts },
             };
+        }
+        case 'ADD_ROLEPLAY_MESSAGE':
+            return { ...state, roleplayHistory: [...state.roleplayHistory, action.payload] };
+        case 'RESET_ROLEPLAY':
+            return { ...state, roleplayHistory: action.payload || [] };
         case 'SET_SUMMARY':
             return { ...state, summary: action.payload };
         case 'SET_STEP':

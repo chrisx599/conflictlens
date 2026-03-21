@@ -5,3 +5,5 @@ server/.env
 __pycache__/
 *.pyc
 .vite/
+
+*.pdf

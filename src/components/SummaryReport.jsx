@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Printer, Copy, Check, ArrowLeft, RotateCcw } from 'lucide-react';
+import { Loader2, Download, Copy, Check, Printer, RefreshCcw } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useLang } from '../context/LanguageContext';
 import { generateSummary } from '../api/client';
@@ -12,17 +12,15 @@ export default function SummaryReport() {
     const assessment = state.assessment || state.conflictStyles;
     const practice = state.practice || { attempts: state.practiceAttempts || [] };
 
-    const [report, setReport] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [copied, setCopied] = useState(false);
-    const [copiedPhrase, setCopiedPhrase] = useState(null);
 
     useEffect(() => {
-        loadSummary();
-    }, []);
+        if (!state.summary) loadSummary();
+    }, [state.summary]);
 
-    const loadSummary = async () => {
+    async function loadSummary() {
         setLoading(true);
         setError(null);
         try {
@@ -30,131 +28,168 @@ export default function SummaryReport() {
                 scenario: state.scenario,
                 assessment,
                 dialogue: state.dialogue,
+                annotationResults: state.annotationResults,
                 practice,
+                roleplayHistory: state.roleplayHistory,
                 language: lang,
             });
-            setReport(result);
             dispatch({ type: 'SET_SUMMARY', payload: result });
         } catch (err) {
             setError(err.message);
         } finally {
             setLoading(false);
         }
-    };
+    }
 
-    const handleCopy = async () => {
-        const text = `${ts.reportPrefix}\n\n` + JSON.stringify(report, null, 2);
-        await navigator.clipboard.writeText(text);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+    const handleCopy = () => {
+        const el = document.getElementById('summary-report-content');
+        if (el) {
+            navigator.clipboard.writeText(el.innerText);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        }
     };
 
     const handlePrint = () => window.print();
 
-    const handleCopyPhrase = async (phrase, idx) => {
-        await navigator.clipboard.writeText(phrase);
-        setCopiedPhrase(idx);
-        setTimeout(() => setCopiedPhrase(null), 2000);
-    };
-
-    if (loading) {
+    if (loading || !state.summary) {
         return (
-            <div className="loading-container">
-                <div className="loading-spinner" />
-                <p className="loading-text">{ts.loadingText}</p>
-            </div>
+            <motion.div className="glass-card" initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                style={{ textAlign: 'center', padding: 'var(--space-12)' }}>
+                {error ? (
+                    <>
+                        <p style={{ color: 'var(--accent-danger)', marginBottom: 'var(--space-4)' }}>{error}</p>
+                        <button className="btn btn--primary" onClick={loadSummary}>{ts.retryBtn}</button>
+                    </>
+                ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-3)' }}>
+                        <Loader2 size={20} className="spin" />
+                        <span>{ts.loadingText}</span>
+                    </div>
+                )}
+            </motion.div>
         );
     }
 
-    if (error) {
-        return (
-            <div className="glass-card" style={{ textAlign: 'center' }}>
-                <p style={{ color: 'var(--accent-danger)', marginBottom: 'var(--space-4)' }}>{error}</p>
-                <button className="btn btn--primary" onClick={loadSummary}>{ts.retryBtn}</button>
-            </div>
-        );
-    }
-
-    if (!report) return null;
+    const s = state.summary;
 
     return (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-6)' }}>
-                <div>
-                    <h2 className="section-title">{ts.title}</h2>
-                    <p className="section-subtitle" style={{ marginBottom: 0 }}>{ts.subtitle}</p>
-                </div>
-                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                    <button className="btn btn--secondary btn--small" onClick={handleCopy}>
-                        {copied ? <><Check size={14} /> {ts.copiedBtn}</> : <><Copy size={14} /> {ts.copyBtn}</>}
-                    </button>
-                    <button className="btn btn--secondary btn--small" onClick={handlePrint}>
-                        <Printer size={14} /> {ts.printBtn}
-                    </button>
-                </div>
+        <motion.div className="glass-card print-report" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+            <div className="no-print" style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-6)', justifyContent: 'flex-end' }}>
+                <button className="btn btn--ghost" onClick={handleCopy}>
+                    {copied ? <><Check size={14} /> {ts.copiedBtn}</> : <><Copy size={14} /> {ts.copyBtn}</>}
+                </button>
+                <button className="btn btn--ghost" onClick={handlePrint}>
+                    <Printer size={14} /> {ts.printBtn}
+                </button>
+                <button className="btn btn--secondary" onClick={handlePrint}>
+                    <Download size={14} /> {ts.downloadPdf}
+                </button>
             </div>
 
-            <div className="glass-card">
-                {/* Conflict Profile */}
-                {report.conflictProfile && (
-                    <div className="report-section">
-                        <h3 style={{ fontSize: 'var(--font-size-lg)', marginBottom: 'var(--space-4)' }}>
-                            {report.conflictProfile.title || ts.title}
+            <div id="summary-report-content">
+                <h2 className="section-title">{ts.title}</h2>
+                <p className="section-subtitle">{ts.subtitle}</p>
+
+                {s.conflictProfile && (
+                    <div className="glass-card--flat" style={{ padding: 'var(--space-6)', marginBottom: 'var(--space-6)', textAlign: 'center' }}>
+                        <h3 style={{ fontSize: 'var(--font-size-xl)', color: 'var(--text-accent)', marginBottom: 'var(--space-3)' }}>
+                            {s.conflictProfile.title}
                         </h3>
-                        <p style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-                            {report.conflictProfile.description}
+                        <p style={{ color: 'var(--text-secondary)', lineHeight: 1.8 }}>
+                            {s.conflictProfile.description}
                         </p>
                     </div>
                 )}
 
-                {/* Patterns */}
-                {report.patterns && report.patterns.length > 0 && (
-                    <div className="report-section">
+                {s.patterns?.length > 0 && (
+                    <div style={{ marginBottom: 'var(--space-6)' }}>
                         <h3 style={{ fontSize: 'var(--font-size-lg)', marginBottom: 'var(--space-4)' }}>{ts.patternsTitle}</h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-                            {report.patterns.map((p, i) => (
-                                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--space-3) var(--space-4)', background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-sm)' }}>
+                            {s.patterns.map((p, i) => (
+                                <div key={i} className="glass-card--flat" style={{ padding: 'var(--space-4)', display: 'flex', gap: 'var(--space-3)' }}>
+                                    <span style={{
+                                        padding: '2px 8px',
+                                        borderRadius: '4px',
+                                        fontSize: 'var(--font-size-xs)',
+                                        background: p.frequency === 'high' ? 'rgba(239,68,68,0.1)' : p.frequency === 'medium' ? 'rgba(245,158,11,0.1)' : 'rgba(34,197,94,0.1)',
+                                        color: p.frequency === 'high' ? 'var(--accent-danger)' : p.frequency === 'medium' ? 'var(--accent-warning)' : 'var(--accent-success)',
+                                        alignSelf: 'flex-start',
+                                        flexShrink: 0,
+                                    }}>
+                                        {ts.frequencyLabels[p.frequency] || p.frequency}
+                                    </span>
                                     <div>
-                                        <p style={{ fontWeight: 600, marginBottom: 'var(--space-1)' }}>{p.name}</p>
+                                        <p style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>{p.name}</p>
                                         <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>{p.description}</p>
                                     </div>
-                                    {p.frequency && (
-                                        <span className={`report-tag report-tag--${p.frequency}`}>
-                                            {ts.frequencyLabels[p.frequency] || p.frequency}
-                                        </span>
-                                    )}
                                 </div>
                             ))}
                         </div>
                     </div>
                 )}
 
-                {/* Growth Highlights */}
-                {report.growthHighlights && report.growthHighlights.length > 0 && (
-                    <div className="report-section">
+                {s.annotationInsights && (
+                    <div style={{ marginBottom: 'var(--space-6)' }}>
+                        <h3 style={{ fontSize: 'var(--font-size-lg)', marginBottom: 'var(--space-4)' }}>{ts.annotationTitle}</h3>
+                        <div className="glass-card--flat" style={{ padding: 'var(--space-4)' }}>
+                            <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginBottom: 'var(--space-3)' }}>
+                                {s.annotationInsights.accuracy}
+                            </p>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
+                                <div>
+                                    <p style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)', color: 'var(--accent-success)', marginBottom: 'var(--space-2)' }}>🎯</p>
+                                    <ul style={{ fontSize: 'var(--font-size-sm)', paddingLeft: 'var(--space-4)', color: 'var(--text-secondary)' }}>
+                                        {(s.annotationInsights.strengths || []).map((item, i) => <li key={i}>{item}</li>)}
+                                    </ul>
+                                </div>
+                                <div>
+                                    <p style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)', color: 'var(--accent-warning)', marginBottom: 'var(--space-2)' }}>💡</p>
+                                    <ul style={{ fontSize: 'var(--font-size-sm)', paddingLeft: 'var(--space-4)', color: 'var(--text-secondary)' }}>
+                                        {(s.annotationInsights.areasToImprove || []).map((item, i) => <li key={i}>{item}</li>)}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {s.growthHighlights?.length > 0 && (
+                    <div style={{ marginBottom: 'var(--space-6)' }}>
                         <h3 style={{ fontSize: 'var(--font-size-lg)', marginBottom: 'var(--space-4)' }}>{ts.growthTitle}</h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                            {report.growthHighlights.map((g, i) => (
-                                <p key={i} style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', paddingLeft: 'var(--space-4)', borderLeft: '2px solid var(--accent-success)' }}>
-                                    {g}
-                                </p>
+                            {s.growthHighlights.map((g, i) => (
+                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                                    <span style={{ color: 'var(--accent-success)' }}>🌱</span>
+                                    <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>{g}</p>
+                                </div>
                             ))}
                         </div>
                     </div>
                 )}
 
-                {/* Action Plan */}
-                {report.actionPlan && report.actionPlan.length > 0 && (
-                    <div className="report-section">
+                {s.actionPlan?.length > 0 && (
+                    <div style={{ marginBottom: 'var(--space-6)' }}>
                         <h3 style={{ fontSize: 'var(--font-size-lg)', marginBottom: 'var(--space-4)' }}>{ts.actionTitle}</h3>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-                            {report.actionPlan.map((a, i) => (
-                                <div key={i}>
-                                    <p style={{ fontWeight: 600, marginBottom: 'var(--space-1)' }}>{a.action}</p>
-                                    <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)' }}>{a.detail}</p>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+                            {s.actionPlan.map((a, i) => (
+                                <div key={i} className="glass-card--flat" style={{ padding: 'var(--space-4)' }}>
+                                    <p style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)', marginBottom: 'var(--space-2)' }}>
+                                        🎯 {a.action}
+                                    </p>
+                                    <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-secondary)', marginBottom: 'var(--space-2)' }}>
+                                        {a.detail}
+                                    </p>
                                     {a.example && (
-                                        <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--accent-tertiary)', fontStyle: 'italic', marginTop: 'var(--space-1)' }}>
-                                            &ldquo;{a.example}&rdquo;
+                                        <p style={{
+                                            fontSize: 'var(--font-size-sm)',
+                                            fontStyle: 'italic',
+                                            color: 'var(--text-accent)',
+                                            padding: 'var(--space-2) var(--space-3)',
+                                            background: 'rgba(124, 92, 252, 0.06)',
+                                            borderRadius: 'var(--radius-sm)',
+                                        }}>
+                                            "{a.example}"
                                         </p>
                                     )}
                                 </div>
@@ -163,20 +198,14 @@ export default function SummaryReport() {
                     </div>
                 )}
 
-                {/* Toolkit */}
-                {report.toolkit && report.toolkit.length > 0 && (
-                    <div className="report-section">
+                {s.toolkit?.length > 0 && (
+                    <div style={{ marginBottom: 'var(--space-6)' }}>
                         <h3 style={{ fontSize: 'var(--font-size-lg)', marginBottom: 'var(--space-2)' }}>{ts.toolkitTitle}</h3>
-                        <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--text-tertiary)', marginBottom: 'var(--space-4)' }}>
-                            {ts.toolkitHint}
-                        </p>
+                        <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-tertiary)', marginBottom: 'var(--space-4)' }}>{ts.toolkitHint}</p>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
-                            {report.toolkit.map((phrase, i) => (
-                                <button key={i}
-                                    className="btn btn--secondary btn--small"
-                                    onClick={() => handleCopyPhrase(phrase, i)}
-                                    style={{ fontSize: 'var(--font-size-sm)' }}>
-                                    {copiedPhrase === i ? <Check size={12} /> : null}
+                            {s.toolkit.map((phrase, i) => (
+                                <button key={i} className="btn btn--secondary" style={{ fontSize: 'var(--font-size-sm)' }}
+                                    onClick={() => navigator.clipboard.writeText(phrase)}>
                                     {phrase}
                                 </button>
                             ))}
@@ -184,21 +213,27 @@ export default function SummaryReport() {
                     </div>
                 )}
 
-                {report.closingMessage && (
-                    <div className="report-section">
-                        <p style={{ color: 'var(--text-secondary)', lineHeight: 1.7 }}>
-                            {report.closingMessage}
+                {s.closingMessage && (
+                    <div style={{
+                        textAlign: 'center',
+                        padding: 'var(--space-6)',
+                        background: 'linear-gradient(135deg, rgba(124, 92, 252, 0.08), rgba(168, 85, 247, 0.08))',
+                        borderRadius: 'var(--radius-lg)',
+                        marginBottom: 'var(--space-6)',
+                    }}>
+                        <p style={{ fontSize: 'var(--font-size-md)', color: 'var(--text-accent)', fontWeight: 500 }}>
+                            {s.closingMessage}
                         </p>
                     </div>
                 )}
             </div>
 
-            <div style={{ display: 'flex', gap: 'var(--space-4)', marginTop: 'var(--space-6)', justifyContent: 'center' }}>
-                <button className="btn btn--secondary" onClick={() => dispatch({ type: 'SET_STEP', payload: 3 })}>
-                    <ArrowLeft size={16} /> {ts.backToPractice}
+            <div className="no-print" style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'center' }}>
+                <button className="btn btn--ghost" onClick={() => dispatch({ type: 'SET_STEP', payload: 3 })}>
+                    {ts.backToPractice}
                 </button>
                 <button className="btn btn--primary" onClick={() => dispatch({ type: 'RESET' })}>
-                    <RotateCcw size={16} /> {ts.restart}
+                    <RefreshCcw size={14} /> {ts.restart}
                 </button>
             </div>
         </motion.div>

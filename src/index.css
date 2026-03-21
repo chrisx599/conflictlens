@@ -1081,3 +1081,58 @@ body::before {
 .style-bar__label {
   width: 90px;
 }
+
+/* ===== Print Styles for PDF Export ===== */
+@media print {
+  body {
+    background: white !important;
+    color: #111 !important;
+  }
+
+  body::before {
+    display: none !important;
+  }
+
+  .no-print,
+  .step-progress,
+  .lang-toggle,
+  header {
+    display: none !important;
+  }
+
+  .glass-card,
+  .glass-card--flat {
+    background: white !important;
+    backdrop-filter: none !important;
+    border: 1px solid #ddd !important;
+    box-shadow: none !important;
+    page-break-inside: avoid;
+  }
+
+  .section-title {
+    background: none !important;
+    -webkit-text-fill-color: #111 !important;
+    color: #111 !important;
+  }
+
+  .print-report {
+    padding: 2rem !important;
+  }
+
+  * {
+    color: #111 !important;
+  }
+
+  .btn {
+    display: none !important;
+  }
+
+  .print-report .btn {
+    display: none !important;
+  }
+}
+
+/* ===== Spin Animation (for Loader2) ===== */
+.spin {
+  animation: spin 1s linear infinite;
+}

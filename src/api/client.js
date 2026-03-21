@@ -160,6 +160,24 @@ async function request(path, options = {}) {
     return res.json();
 }
 
+export async function uploadScreenshot(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch(`${API_BASE}/screenshot/upload`, {
+        method: 'POST',
+        body: formData,
+    });
+    if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`API error ${res.status}: ${text}`);
+    }
+    return res.json();
+}
+
+export async function estimatePartnerAnswers(data) {
+    return request('/assess/estimate', { method: 'POST', body: JSON.stringify(data) });
+}
+
 export async function assessStyles(data) {
     const result = await request('/assess', { method: 'POST', body: JSON.stringify(data) });
     return normalizeAssessmentResponse(result);
@@ -174,6 +192,14 @@ export async function submitReflection(data) {
     return request('/dialogue/reflect', { method: 'POST', body: JSON.stringify(data) });
 }
 
+export async function checkAnnotation(data) {
+    return request('/dialogue/check-annotation', { method: 'POST', body: JSON.stringify(data) });
+}
+
+export async function getAnnotationSummary(data) {
+    return request('/dialogue/annotation-summary', { method: 'POST', body: JSON.stringify(data) });
+}
+
 export async function submitRewrite(data) {
     const result = await request('/practice/rewrite', { method: 'POST', body: JSON.stringify(data) });
     return normalizeRewriteResponse(result);
@@ -182,6 +208,14 @@ export async function submitRewrite(data) {
 export async function getHint(data) {
     const result = await request('/practice/hint', { method: 'POST', body: JSON.stringify(data) });
     return normalizeHintResponse(result);
+}
+
+export async function sendRoleplayMessage(data) {
+    return request('/practice/roleplay', { method: 'POST', body: JSON.stringify(data) });
+}
+
+export async function getRewriteSuggestion(data) {
+    return request('/practice/suggest-rewrite', { method: 'POST', body: JSON.stringify(data) });
 }
 
 export async function generateSummary(data) {

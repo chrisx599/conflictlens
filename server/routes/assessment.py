@@ -30,13 +30,21 @@ async def assess_conflict_styles(req: AssessmentRequest):
 
     user_prompt = f"""Conflict scenario: {req.scenario}
 
-Self ({req.selfName}) quiz answers: {req.selfAnswers}
-Other ({req.otherName}) quiz answers: {req.otherAnswers}
+Self ({req.selfName}) RPCS questionnaire answers (13 items, 1-5 Likert scale): {req.selfAnswers}
+Other ({req.otherName}) RPCS questionnaire answers (13 items, 1-5 Likert scale): {req.otherAnswers}
 Relationship type: {req.relationship}
+
+Subscale mapping:
+- Items 1-2: Compromise
+- Items 3-4: Domination
+- Items 5-6: Submission
+- Items 7-8: Separation
+- Items 9-10: Avoidance
+- Items 11-13: Interactional Reactivity
 
 {lang_instruction}
 
-Please analyze both parties' conflict styles."""
+Please analyze both parties' conflict styles based on their RPCS scores."""
 
     result = chat_json(STYLE_ASSESSMENT_SYSTEM, user_prompt)
     return result
