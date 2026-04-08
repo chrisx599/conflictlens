@@ -64,7 +64,6 @@ function normalizeDialogueResponse(data = {}, context = {}) {
 
     return {
         lines: rawLines.map(line => {
-            const hasPattern = Boolean(firstDefined(line.has_pattern, line.hasPattern, false));
             const pattern = normalizePattern(firstDefined(line.pattern, line.pattern_type, line.pattern_label));
             const speaker = line.speaker === 'self'
                 ? context.selfName
@@ -75,7 +74,10 @@ function normalizeDialogueResponse(data = {}, context = {}) {
             return {
                 speaker: speaker || '',
                 text: firstDefined(line.text, ''),
-                pattern: hasPattern ? pattern : null,
+                // Newer dialogue responses return `pattern` directly and may omit
+                // the legacy `has_pattern` flag entirely. Trust the normalized
+                // pattern value so we don't incorrectly erase AI labels.
+                pattern,
                 explanation: firstDefined(line.explanation, line.pattern_explanation, ''),
             };
         }),

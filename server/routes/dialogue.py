@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Optional, List, Dict
 from ..llm import chat_json
-from ..prompts import DIALOGUE_GENERATION_SYSTEM
+from ..prompts import DIALOGUE_GENERATION_SYSTEM, DIALOGUE_ANNOTATION_SYSTEM
 
 router = APIRouter()
 
@@ -11,6 +11,98 @@ BEHAVIOR_TYPES = [
     "blaming", "invalidation", "mind_reading",
     "overgeneralizing", "demanding", "passive_aggression", "interrupting",
 ]
+
+BEHAVIOR_ALIASES = {
+    "none": None,
+    "null": None,
+    "critic": "criticism",
+    "defensive": "defensiveness",
+    "passive aggression": "passive_aggression",
+}
+
+
+def normalize_behavior_label(value):
+    if value is None:
+        return None
+
+    normalized = str(value).strip().lower()
+    if not normalized:
+        return None
+
+    normalized = BEHAVIOR_ALIASES.get(normalized, normalized)
+    if normalized in BEHAVIOR_TYPES:
+        return normalized
+    return None
+
+
+def normalize_dialogue_line(line):
+    return {
+        "speaker": str(line.get("speaker", "") or ""),
+        "text": str(line.get("text", "") or ""),
+        "pattern": normalize_behavior_label(line.get("pattern") or line.get("pattern_type") or line.get("pattern_label")),
+        "explanation": str(line.get("explanation", "") or line.get("pattern_explanation", "") or ""),
+    }
+
+
+def normalize_dialogue_payload(payload):
+    raw_lines = payload.get("lines")
+    if not isinstance(raw_lines, list):
+        raw_lines = payload.get("dialogue")
+    if not isinstance(raw_lines, list):
+        raw_lines = []
+
+    return {
+        "lines": [normalize_dialogue_line(line) for line in raw_lines if isinstance(line, dict)],
+        "overallAnalysis": str(payload.get("overallAnalysis", "") or payload.get("overall_analysis", "") or ""),
+        "recommendedResetPoints": payload.get("recommendedResetPoints", []) or [],
+    }
+
+
+def needs_annotation_fallback(lines):
+    if not lines:
+        return False
+
+    labeled_count = sum(1 for line in lines if line.get("pattern"))
+    # If the model labeled nothing, or barely labeled anything in a clearly
+    # conflict-heavy dialogue, run a dedicated annotation pass.
+    return labeled_count == 0 or labeled_count < max(2, len(lines) // 5)
+
+
+def annotate_dialogue_lines(lines, language):
+    lang_instruction = (
+        "Please respond entirely in English."
+        if language == "en"
+        else "请用中文回答。"
+    )
+
+    numbered_lines = "\n".join(
+        f'{idx}. {line.get("speaker", "")}: {line.get("text", "")}'
+        for idx, line in enumerate(lines)
+    )
+
+    user_prompt = f"""Dialogue lines:
+{numbered_lines}
+
+{lang_instruction}
+
+Please annotate each line with the most relevant behavior label or null."""
+
+    result = chat_json(DIALOGUE_ANNOTATION_SYSTEM, user_prompt, temperature=0.2)
+    annotated_payload = normalize_dialogue_payload(result)
+    annotated_lines = annotated_payload["lines"]
+
+    if len(annotated_lines) != len(lines):
+        return lines
+
+    merged_lines = []
+    for original, annotated in zip(lines, annotated_lines):
+        merged_lines.append({
+            "speaker": original.get("speaker", "") or annotated.get("speaker", ""),
+            "text": original.get("text", "") or annotated.get("text", ""),
+            "pattern": annotated.get("pattern"),
+            "explanation": annotated.get("explanation", ""),
+        })
+    return merged_lines
 
 
 class DialogueGenerateRequest(BaseModel):
@@ -65,7 +157,12 @@ Use "{req.selfName}" and "{req.otherName}" as the speaker names.
 Please generate a realistic conflict dialogue (12-15 turns) for this scenario. Label each line with one of the 11 behavior types or null."""
 
     result = chat_json(DIALOGUE_GENERATION_SYSTEM, user_prompt)
-    return result
+    normalized = normalize_dialogue_payload(result)
+
+    if needs_annotation_fallback(normalized["lines"]):
+        normalized["lines"] = annotate_dialogue_lines(normalized["lines"], req.language)
+
+    return normalized
 
 
 @router.post("/api/dialogue/reflect")
@@ -108,12 +205,12 @@ async def check_annotations(req: AnnotationCheckRequest):
 
     for idx, line in enumerate(req.lines):
         idx_str = str(idx)
-        ai_label = line.get("pattern") or None
+        ai_label = line.get("pattern")
         user_label = req.userAnnotations.get(idx_str)
 
         # Normalize
-        ai_norm = ai_label if ai_label else None
-        user_norm = user_label if user_label else None
+        ai_norm = normalize_behavior_label(ai_label)
+        user_norm = normalize_behavior_label(user_label)
 
         is_correct = ai_norm == user_norm
         if is_correct:
@@ -139,8 +236,8 @@ async def annotation_summary(req: AnnotationSummaryRequest):
     comparisons = []
     for idx, line in enumerate(req.lines):
         idx_str = str(idx)
-        ai_label = line.get("pattern") or None
-        user_label = req.userAnnotations.get(idx_str) or None
+        ai_label = normalize_behavior_label(line.get("pattern"))
+        user_label = normalize_behavior_label(req.userAnnotations.get(idx_str))
         comparisons.append({
             "line": line.get("text", ""),
             "speaker": line.get("speaker", ""),
